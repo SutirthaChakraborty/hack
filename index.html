@@ -74,7 +74,7 @@
                  formData.append("file", file);
 
                  try {
-                     const response = await fetch("http://10.100.119.220:8000/upload_video", {
+                     const response = await fetch("http://10.100.119.220:8000/upload_video", {    // TODO:PUT THE SERVER IP ADDRESS or LOCALHOST
                          method: "POST",
                          body: formData,
                      });
