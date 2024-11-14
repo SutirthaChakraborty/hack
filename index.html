@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Player with SRT Support</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            height: 100vh;
+            background-color: #f3f4f6;
+            margin: 0;
+        }
+        .container {
+            text-align: center;
+        }
+        video {
+            width: 80%;
+            max-width: 800px;
+            margin-top: 20px;
+            border: 2px solid #444;
+            border-radius: 10px;
+        }
+        input {
+            margin: 10px;
+        }
+        #status {
+            margin-top: 15px;
+            font-size: 1.2em;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Video Player with Highlight Segments</h2>
+        <input type="file" id="videoInput" accept="video/*">
+        <button id="uploadBtn">Upload and Process Video</button>
+        <video id="videoPlayer" controls></video>
+        <div id="status"></div>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const videoPlayer = document.getElementById("videoPlayer");
+            const videoInput = document.getElementById("videoInput");
+            const uploadBtn = document.getElementById("uploadBtn");
+            const statusDiv = document.getElementById("status");
+
+            let highlights = [];
+            let currentHighlightIndex = 0;
+
+            // Function to upload the video file to the server
+            async function uploadVideo(file) {
+                const formData = new FormData();
+                formData.append("file", file);
+
+                try {
+                    const response = await fetch("http://localhost:8000/upload_video", {
+                        method: "POST",
+                        body: formData,
+                    });
+
+                    if (!response.ok) {
+                        throw new Error("Failed to upload video.");
+                    }
+
+                    const data = await response.json();
+                    statusDiv.textContent = "Video uploaded and processed successfully.";
+                    return data;
+                } catch (error) {
+                    statusDiv.textContent = "Error uploading video: " + error.message;
+                    return null;
+                }
+            }
+
+            // Function to parse the JSON response and set the highlights
+            function setHighlights(data) {
+                if (data && data.highlights) {
+                    highlights = data.highlights.map(item => ({
+                        start: toSeconds(item.start),
+                        end: toSeconds(item.end),
+                        confidence: item.confidence
+                    }));
+                    statusDiv.textContent = "Highlights loaded successfully.";
+                } else {
+                    statusDiv.textContent = "No highlights found.";
+                }
+            }
+
+            // Convert "HH:MM:SS,SSS" to seconds
+            function toSeconds(time) {
+                const parts = time.split(/[:,]/);
+                return parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]) + parseInt(parts[3]) / 1000;
+            }
+
+            // Handle video upload button click
+            uploadBtn.addEventListener("click", async () => {
+                const videoFile = videoInput.files[0];
+                if (videoFile) {
+                    statusDiv.textContent = "Uploading video...";
+                    const responseData = await uploadVideo(videoFile);
+                    if (responseData) {
+                        setHighlights(responseData);
+                        const videoUrl = URL.createObjectURL(videoFile);
+                        videoPlayer.src = videoUrl;
+                    }
+                } else {
+                    statusDiv.textContent = "Please select a video file.";
+                }
+            });
+
+            // Listen to time updates on the video player
+            videoPlayer.addEventListener("timeupdate", () => {
+                if (currentHighlightIndex < highlights.length) {
+                    const { start, end } = highlights[currentHighlightIndex];
+
+                    // If the current time exceeds the end time of the current highlight, move to the next one
+                    if (videoPlayer.currentTime > end) {
+                        currentHighlightIndex++;
+                        if (currentHighlightIndex < highlights.length) {
+                            videoPlayer.currentTime = highlights[currentHighlightIndex].start;
+                        } else {
+                            videoPlayer.pause();
+                        }
+                    }
+                }
+            });
+
+            // Play the next highlight when the video ends
+            videoPlayer.addEventListener("ended", () => {
+                currentHighlightIndex++;
+                if (currentHighlightIndex < highlights.length) {
+                    videoPlayer.currentTime = highlights[currentHighlightIndex].start;
+                    videoPlayer.play();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
