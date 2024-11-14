@@ -60,7 +60,7 @@
                 formData.append("file", file);
 
                 try {
-                    const response = await fetch("http://localhost:8000/upload_video", {
+                    const response = await fetch("https://08d3-144-198-114-10.ngrok-free.app/upload_video", {
                         method: "POST",
                         body: formData,
                     });
